@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "45cfb028b9067d5d122fb0b38f5de6af",
+    "content-hash": "91215bf621eb6ca35308fcd732cb121e",
     "packages": [
         {
             "name": "bmatovu/oauth-negotiator",
@@ -6193,6 +6193,10 @@
     "prefer-stable": true,
     "prefer-lowest": false,
     "platform": {
+        "ext-curl": "*",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-openssl": "*",
         "php": "^7.2"
     },
     "platform-dev": []
