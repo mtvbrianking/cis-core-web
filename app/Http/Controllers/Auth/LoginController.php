@@ -5,10 +5,15 @@ namespace App\Http\Controllers\Auth;
 use App\Models\User;
 use GuzzleHttp\Client;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Log;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Hash;
+use GuzzleHttp\Exception\ClientException;
+use GuzzleHttp\Exception\ServerException;
+use GuzzleHttp\Exception\ConnectException;
+use GuzzleHttp\Exception\RequestException;
+use App\Http\Clients\PasswordClientInterface;
 use Illuminate\Foundation\Auth\AuthenticatesUsers;
+use App\Http\Clients\ClientCredentialsClientInterface;
 
 class LoginController extends Controller
 {
@@ -33,12 +38,33 @@ class LoginController extends Controller
     protected $redirectTo = '/';
 
     /**
+     * Client credentials client.
+     *
+     * @var \App\Http\Clients\ClientCredentialsClientInterface
+     */
+    protected $machineClient;
+
+    /**
+     * Password client.
+     *
+     * @var \App\Http\Clients\PasswordClientInterface
+     */
+    protected $userClient;
+
+    /**
      * Create a new controller instance.
+     *
+     * @param \App\Http\Clients\ClientCredentialsClientInterface $clientCredentialsClient
+     * @param \App\Http\Clients\PasswordClientInterface          $passwordClient
      *
      * @return void
      */
-    public function __construct()
-    {
+    public function __construct(
+        ClientCredentialsClientInterface $clientCredentialsClient,
+        PasswordClientInterface $passwordClient
+    ) {
+        $this->machineClient = $clientCredentialsClient;
+        $this->userClient = $passwordClient;
         $this->middleware('guest')->except('logout');
     }
 
@@ -86,70 +112,61 @@ class LoginController extends Controller
             return $this->sendLoginResponse($request);
         }
 
-        ddd('EOF');
-        // Send failed login response.
+        return $this->sendFailedLoginResponse($request);
     }
 
     /**
      * Remote authentication.
      *
-     * @param mixed $request
+     * @param \Illuminate\Http\Request $request
+     *
+     * @return object|\Symfony\Component\HttpFoundation\Response Remote user or http reponse.
      */
     public function remoteAuth($request)
     {
         try {
-            $client = new Client();
-
-            $options = [
-                'headers' => [
-                    'Authorization' => 'Bearer eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiIsImp0aSI6IjAzNDBiZGJjOTg4ZTY3MThhYWEwM2Y0Y2EzZjkwZjE0NjIxZTEzMWZiNDM2MWMxNTYwOTAyNmI5ZDQ0NzRkMjk5MThhNGMxNjJmNGYyMWE3In0.eyJhdWQiOiIxYmYwYjAzZS0xYzYyLTQ1ZTMtYmYxOC1jNTk4OWNiNDNkZGUiLCJqdGkiOiIwMzQwYmRiYzk4OGU2NzE4YWFhMDNmNGNhM2Y5MGYxNDYyMWUxMzFmYjQzNjFjMTU2MDkwMjZiOWQ0NDc0ZDI5OTE4YTRjMTYyZjRmMjFhNyIsImlhdCI6MTU3MTMyODk2MywibmJmIjoxNTcxMzI4OTYzLCJleHAiOjE1NzI2MjQ5NjMsInN1YiI6IjIxNWJmMTBjLWFjZDYtNDY0My1hYWE3LWVjMTIwZGY3NGNjMyIsInNjb3BlcyI6W119.Npuur1z-fjsf4cDfrmfvRRmUllGGEJ0STH95U_0UWJMVJ-p5cWwx3uhO8q6qyZjfxy_CRV6hj89GUw0gvTgjoQXJ8Oy_vqLoJHQ8ruyJ6KXxHVAcBMPYXZNOYD68OgDhLCkA1LfLCEqqY0c6olV3nk2ffQkQg9nVA1A_mVfkbbVsTb00j4U8b4-ZqDpxJMAceLMGgUgtAAcSPcDcJHkX79o_1oy4cOn7DLrVB9UEXsv--T5Xkr7ygx7ES-88ooZJMnVWFEzOV0bS5Q6TuMsSjbEfxbmzlKN-Ff2rH-ppoo3kuGsgb6vjTx-rGZhSs4hGQgNAvBzz21exupTLtHJ87f8ClaXGN8_i1UWAqJXi1nSnoA_a6Jf83RkiJL_e63WQsxHaxwjkViqCkJ2dJpPZT8yoQOGRfnZO_fz82zrOnW7GXfVVbOHGB118vnhsZkQZAkV4iBp2MeRalOVmNUg8jjZx9StbR3l4ZPPZkONhh_4zADB_iaF_27uvqlIIn_fA9kRPTiuJSzK2TJ_O_M6bA9aC7jgavso4XRgxQkcIhflPwiiMfAfJ_Tm6q1dC7ap9cBRDz57zav7goWRq2jgK9OwzFZkeflQHcWhaFNGA3oJTyyMb5Wbr4KTIMbR43QaewSOm0pLjtMdftkdPx2iHN3vivAc0ABtWwSqayooL4ZU',
-                    'Accept' => 'application/json',
-                ],
+            $response = $this->machineClient->post('users/auth', [
                 'form_params' => [
-                    'grant_type' => 'password',
-                    'client_id' => '1bf0b03e-1c62-45e3-bf18-c5989cb43dde',
-                    'client_secret' => 'S8xqNQxus0L4cCJA8lQ4nKLayIQjfc4YOXz9MSWp',
                     'email' => $request->email,
                     'password' => $request->password,
                 ],
-            ];
-
-            $response = $client->post('http://localhost:90/cis-core-api/public/api/v1/oauth/token', $options);
+            ]);
 
             $api_response = json_decode($response->getBody());
 
-            return $api_response->user;
-        } catch (\GuzzleHttp\Exception\ClientException $ex) {
+            return $api_response;
+        } catch (ConnectException $ex) {
+            flash($ex->getMessage())->error()->important();
+        } catch (ClientException $ex) {
             // If the login attempt was unsuccessful we will increment the number of attempts
             // to login and redirect the user back to the login form. Of course, when this
             // user surpasses their maximum number of attempts they will get locked out.
             $this->incrementLoginAttempts($request);
 
-            $status = $ex->getResponse()->getStatusCode();
-            if ($status == 401) {
-                $response = json_decode($ex->getResponse()->getBody(), true);
+            $statusCode = $ex->getResponse()->getStatusCode();
 
-                flash($response['error'])->warning()->important();
+            $body = json_decode($ex->getResponse()->getBody(), true);
 
-                return redirect()->back();
-            }
-            if ($status == 422) {
-                $response = json_decode($ex->getResponse()->getBody(), true);
+            if ($statusCode == 422) {
+                flash($body['message'])->warning()->important();
 
                 return redirect()->back()
                     ->withInput($request->only('email', 'remember'))
-                    ->withErrors($response['errors']);
+                    ->withErrors($body['errors']);
             }
-        } catch (\GuzzleHttp\Exception\RequestException $ex) {
-            Log::error(json_encode([$ex->getCode() => $ex->getMessage()]));
-            flash('Something went terribly wrong')->warning()->important();
 
-            return redirect()->back();
-        } catch (\GuzzleHttp\Exception\ServerException $ex) {
-            flash("Server can't process request.")->warning()->important();
+            flash($body['message'])->warning()->important();
+        } catch (RequestException $ex) {
+            $body = json_decode($ex->getResponse()->getBody(), true);
 
-            return redirect()->back();
+            flash($body['message'])->warning()->important();
+        } catch (ServerException $ex) {
+            $body = json_decode($ex->getResponse()->getBody(), true);
+
+            flash($body['message'])->error()->important();
         }
+
+        return redirect()->back();
     }
 
     /**
