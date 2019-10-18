@@ -49,7 +49,7 @@ class LoginController extends Controller
      *
      * @var \App\Http\Clients\PasswordClientInterface
      */
-    protected $userClient;
+    protected $passwordClient;
 
     /**
      * Create a new controller instance.
@@ -64,7 +64,7 @@ class LoginController extends Controller
         PasswordClientInterface $passwordClient
     ) {
         $this->machineClient = $clientCredentialsClient;
-        $this->userClient = $passwordClient;
+        $this->passwordClient = $passwordClient;
         $this->middleware('guest')->except('logout');
     }
 
@@ -94,17 +94,13 @@ class LoginController extends Controller
             return $this->sendLockoutResponse($request);
         }
 
-        // if ($this->attemptLogin($request)) {
-        //     return $this->sendLoginResponse($request);
-        // }
+        $response = $this->remoteLogin($request);
 
-        $alien = $this->remoteAuth($request);
-
-        if ($alien instanceof \Symfony\Component\HttpFoundation\Response) {
-            return $alien;
+        if ($response instanceof \Symfony\Component\HttpFoundation\Response) {
+            return $response;
         }
 
-        $this->syncRemoteUser($alien, $request->password);
+        $this->syncRemoteUser($response, $request->password);
 
         // Attempt local login
 
@@ -116,13 +112,69 @@ class LoginController extends Controller
     }
 
     /**
+     * Log the user out of the application.
+     *
+     * @param \Illuminate\Http\Request $request
+     *
+     * @return \Illuminate\Http\Response
+     */
+    public function logout(Request $request)
+    {
+        $response = $this->remoteLogout($request);
+
+        if ($response instanceof \Symfony\Component\HttpFoundation\Response) {
+            return $response;
+        }
+
+        $this->guard()->logout();
+
+        $request->session()->invalidate();
+
+        return $this->loggedOut($request) ?: redirect('/');
+    }
+
+    /**
+     * Remote deauthentication.
+     *
+     * @param \Illuminate\Http\Request $request
+     *
+     * @return int|\Symfony\Component\HttpFoundation\Response Remote user or http response.
+     */
+    protected function remoteLogout($request)
+    {
+        try {
+            $response = $this->passwordClient->post('users/deauth');
+
+            return $response->getStatusCode();
+        } catch (ConnectException $ex) {
+            flash('Error connecting to remote service.')->error()->important();
+        } catch (ClientException $ex) {
+            $statusCode = $ex->getResponse()->getStatusCode();
+
+            $body = json_decode($ex->getResponse()->getBody(), true);
+
+            flash($body['message'])->warning()->important();
+        } catch (RequestException $ex) {
+            $body = json_decode($ex->getResponse()->getBody(), true);
+
+            flash($body['message'])->warning()->important();
+        } catch (ServerException $ex) {
+            $body = json_decode($ex->getResponse()->getBody(), true);
+
+            flash($body['message'])->error()->important();
+        }
+
+        return redirect()->back();
+    }
+
+    /**
      * Remote authentication.
      *
      * @param \Illuminate\Http\Request $request
      *
-     * @return object|\Symfony\Component\HttpFoundation\Response Remote user or http reponse.
+     * @return object|\Symfony\Component\HttpFoundation\Response Remote user or http response.
      */
-    public function remoteAuth($request)
+    protected function remoteLogin($request)
     {
         try {
             $response = $this->machineClient->post('users/auth', [
@@ -136,7 +188,7 @@ class LoginController extends Controller
 
             return $api_response;
         } catch (ConnectException $ex) {
-            flash($ex->getMessage())->error()->important();
+            flash('Error connecting to remote service.')->error()->important();
         } catch (ClientException $ex) {
             // If the login attempt was unsuccessful we will increment the number of attempts
             // to login and redirect the user back to the login form. Of course, when this
@@ -177,7 +229,7 @@ class LoginController extends Controller
      *
      * @return App\Models\User
      */
-    public function syncRemoteUser(object $alien, string $secret): User
+    protected function syncRemoteUser(object $alien, string $secret): User
     {
         // Prevent duplicate user accounts
         User::query()
