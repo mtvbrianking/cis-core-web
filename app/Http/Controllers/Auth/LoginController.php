@@ -7,6 +7,7 @@ use GuzzleHttp\Client;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use Illuminate\Support\Facades\Hash;
+use App\Repositories\TokenRepository;
 use GuzzleHttp\Exception\ClientException;
 use GuzzleHttp\Exception\ServerException;
 use GuzzleHttp\Exception\ConnectException;
@@ -101,6 +102,14 @@ class LoginController extends Controller
         }
 
         $this->syncRemoteUser($response, $request->password);
+
+        // Backup password-grant token
+
+        $tokenRepository = new TokenRepository(); // DI
+
+        $tokenRepository->create((array) $response->token);
+
+        // ...
 
         // Attempt local login
 
