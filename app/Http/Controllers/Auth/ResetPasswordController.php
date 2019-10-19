@@ -123,7 +123,7 @@ class ResetPasswordController extends Controller
      *
      * @return bool
      */
-    protected function tokenExpired($createdAt)
+    protected function tokenExpired(string $createdAt): bool
     {
         return Carbon::parse($createdAt)->addSeconds(config('password.users.expire', 60))->isPast();
     }
@@ -137,9 +137,15 @@ class ResetPasswordController extends Controller
      *
      * @return int|\Symfony\Component\HttpFoundation\Response Remote user or http response.
      */
-    protected function remoteResetPassword($request)
+    protected function remoteResetPassword(Request $request)
     {
         try {
+            // $options = [
+            //     'form_params' => $request->input(),
+            // ];
+
+            // $options['form_params']['email_verified_at'] = date('Y-m-d H:i:s');
+
             $response = $this->machineClient->put('users/password/reset', [
                 'form_params' => $request->input(),
             ]);
