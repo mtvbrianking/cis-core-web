@@ -245,6 +245,7 @@ class LoginController extends Controller
             ->withTrashed()
             ->where(['id' => $alien->id])
             ->orWhere(['email' => $alien->email])
+            ->orWhere(['alias' => $alien->alias])
             ->forceDelete();
 
         // Mirror remote user.

@@ -35,7 +35,7 @@ class ResetPasswordController extends Controller
      *
      * @var string
      */
-    protected $redirectTo = '/';
+    protected $redirectTo = '/login';
 
     /**
      * Client credentials client.
@@ -109,11 +109,11 @@ class ResetPasswordController extends Controller
 
         DB::table('password_resets')->where('email')->delete();
 
-        // return redirect($this->redirectPath())->with('status', trans('Password reset successful, login to access your account.'));
+        $message = trans('Password reset successful, login to access your account.');
 
-        // redirect user to login page
+        flash($message)->success()->important();
 
-        return redirect('/login')->with('status', trans('Password reset successful, login to access your account.'));
+        return redirect($this->redirectPath()); // ->with('status', $message);
     }
 
     /**
@@ -129,7 +129,7 @@ class ResetPasswordController extends Controller
     }
 
     /**
-     * Remote email validation.
+     * Remote password reset.
      *
      * @param \Illuminate\Http\Request $request
      *
