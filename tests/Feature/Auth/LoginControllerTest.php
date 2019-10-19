@@ -5,9 +5,11 @@ namespace Tests\Feature\Auth;
 use Tests\TestCase;
 use App\Models\User;
 use Ramsey\Uuid\Uuid;
+use GuzzleHttp\Psr7\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use App\Http\Clients\ClientCredentialsClientInterface;
 
 /**
  * @see \App\Http\Controllers\Auth\LoginController
@@ -35,13 +37,38 @@ class LoginControllerTest extends TestCase
 
     public function test_cant_login_with_invalid_email()
     {
+        $this->withoutExceptionHandling();
+
+        // ...
+
+        $fakeApiResponseHeaders = [
+            'Content-Type' => 'application/json',
+        ];
+
+        $fakeApiResponseBody = [
+            'message' => 'The given data was invalid.',
+            'errors' => [
+                'email' => [
+                    'Wrong email or password.',
+                ],
+            ],
+        ];
+
+        $fakeResponse = new Response(422, $fakeApiResponseHeaders, json_encode($fakeApiResponseBody));
+
+        $mockMachineClient = $this->mockMachineClient($fakeResponse);
+
+        $this->app->instance(ClientCredentialsClientInterface::class, $mockMachineClient);
+
+        // ...
+
         $user = factory(User::class)->create([
             'password' => Hash::make('gJrFhC2B-!Y!4CTk'),
         ]);
 
         $response = $this->from(route('login'))->post(route('login'), [
             'email' => 'unknown@example.com',
-            'password' => $user->password,
+            'password' => 'gJrFhC2B-!Y!4CTk',
         ]);
 
         $response->assertRedirect(route('login'));
