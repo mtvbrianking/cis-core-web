@@ -109,11 +109,14 @@ class ResetPasswordController extends Controller
 
         DB::table('password_resets')->where('email')->delete();
 
+        // Because the use is not logged in yet...
+        // event(new PasswordReset($user));
+
         $message = trans('Password reset successful, login to access your account.');
 
         flash($message)->success()->important();
 
-        return redirect($this->redirectPath()); // ->with('status', $message);
+        return redirect($this->redirectPath());
     }
 
     /**
