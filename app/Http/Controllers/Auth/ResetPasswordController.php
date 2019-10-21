@@ -140,12 +140,6 @@ class ResetPasswordController extends Controller
     protected function remoteResetPassword(Request $request)
     {
         try {
-            // $options = [
-            //     'form_params' => $request->input(),
-            // ];
-
-            // $options['form_params']['email_verified_at'] = date('Y-m-d H:i:s');
-
             $response = $this->machineClient->put('users/password/reset', [
                 'form_params' => $request->input(),
             ]);
