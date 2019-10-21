@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Auth;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use GuzzleHttp\Exception\ClientException;
-use GuzzleHttp\Exception\ServerException;
 use Illuminate\Support\Facades\Validator;
 use GuzzleHttp\Exception\ConnectException;
 use GuzzleHttp\Exception\RequestException;
@@ -98,10 +97,6 @@ class ForgotPasswordController extends Controller
             $body = json_decode($ex->getResponse()->getBody(), true);
 
             flash($body['message'])->warning()->important();
-        } catch (ServerException $ex) {
-            $body = json_decode($ex->getResponse()->getBody(), true);
-
-            flash($body['message'])->error()->important();
         }
 
         return redirect()->back();
