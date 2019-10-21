@@ -13,14 +13,14 @@ class FakeServiceProvider extends AppServiceProvider
     /**
      * Register any application services.
      *
+     * Override app binding - necessary to prevent hitting live API endpoints.
+     *
      * @return void
      */
     public function register(): void
     {
         $this->app->bind(ClientCredentialsClientInterface::class, function () {
-            return new ClientCredentialsClient([
-                'base_uri' => 'Am here dot there',
-            ]);
+            return new ClientCredentialsClient();
         });
 
         $this->app->bind(PasswordClientInterface::class, function () {
